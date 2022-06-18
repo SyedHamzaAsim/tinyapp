@@ -4,6 +4,7 @@ const PORT = 8080;
 const bodyParser = require("body-parser");
 const { cookie } = require("request");
 const cookieParser = require("cookie-parser");
+const bcrypt = require('bcryptjs');
 app.use(cookieParser());
 
 
@@ -17,10 +18,24 @@ function generateRandomString() {
 }
 
 const urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
+  b6UTxQ: {
+    longURL: "https://www.tsn.ca",
+    userID: "aJ48lW"
+  },
+  i3BoGr: {
+    longURL: "https://www.google.ca",
+    userID: "aJ48lW"
+  }
 };
 
+const urlsForUser = function(userId) {
+  let userdata = {};
+  for (let url in urlDatabase) {
+    if (urlDatabase[url].userID === userId) {
+      userdata[url] = urlDatabase[url]
+    }
+  }
+}
 const users = {};
 
 app.get("/", (req, res) => {
@@ -49,19 +64,33 @@ app.get("/fetch", (req, res) => {
 });
 
 app.get("/urls", (req, res) => {
-  const templateVars = { urls: urlDatabase, user: users[req.cookies.user_id]};
+
+ ;
+
+  if (req.cookies.user_id == null){
+    res.redirect('/login');
+  };
+
+  const cookieUser= req.cookies.user_id;
+
+  const templateVars = {urls: urlsForUser(cookieUser), user: users[cookieUser]};
   res.render("urls_index", templateVars);
 });
 
 app.get("/urls/new", (req, res) => {
-  const templateVars = {
-    user: users[req.cookies.user_id]
-  };
-  res.render("urls_new", templateVars);
+
+  if (!users[req.cookies['user_id']]) {
+    res.redirect("/login");
+  } else {
+    const templateVars = {
+      user: users[req.cookies.user_id]
+    };
+    res.render("urls_new", templateVars);
+  }
 });
 
 app.get("/urls/:shortURL", (req, res) => {
-  const templateVars = { shortURL: req.params.shortURL, longURL: req.params.longURL, user: users[req.cookies.user_id]};
+  const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL].longURL, user: users[req.cookies.user_id] };
   res.render("urls_show", templateVars);
 });
 
@@ -69,24 +98,25 @@ app.get("/urls/:shortURL", (req, res) => {
 app.post("/urls", (req, res) => {
   const longURL = req.body.longURL;
   const shortURL = generateRandomString();
-  urlDatabase[shortURL] = longURL;
+  urlDatabase[shortURL] = {};
+  urlDatabase[shortURL]['longURL'] = longURL;
   res.redirect(`/urls/${shortURL}`);
 });
 
 app.get("/u/:shortURL", (req, res) => {
   const shortURL = req.params.shortURL;
-  const longURL = urlDatabase[shortURL];
+  const longURL = urlDatabase[shortURL].longURL;
   res.redirect(longURL);
 });
 
 app.post('/urls/:shortURL/delete', (req, res) => {
   delete urlDatabase[req.params.shortURL]
   res.redirect(`/urls`)
-}); 
+});
 
 app.post('/urls/:shortURL', (req, res) => {
   urlDatabase[req.params.shortURL] = req.body.editURL;
-  res.redirect('/urls') 
+  res.redirect('/urls')
 });
 
 app.post('/login', (req, res) => {
@@ -94,7 +124,7 @@ app.post('/login', (req, res) => {
   const user = findEmail(req.body.email, users);
 
   if (user) {
-    if (req.body.password == user['password']) {
+    if (bcrypt.compareSync(req.body.password, user['password'])) {
       res.cookie('user_id', user['id']);
       res.redirect('/urls');
     } else {
@@ -105,8 +135,9 @@ app.post('/login', (req, res) => {
   }
 });
 
-app.get("/logout", (req, res) => {
-  req.cookies.user_id = null;
+app.post("/logout", (req, res) => {
+  
+  res.clearCookie("user_id")
   res.redirect("/urls");
 })
 
@@ -117,7 +148,7 @@ app.get("/register", (req, res) => {
 });
 
 const findEmail = (email, users) => {
-  for(let user in users) {
+  for (let user in users) {
     if (users[user].email === email) {
       return users[user];
     }
@@ -125,9 +156,7 @@ const findEmail = (email, users) => {
   return false;
 };
 
-app.post('/register',(req, res) => {
-  console.log(users);
-  console.log(req.body);
+app.post('/register', (req, res) => {
 
   let id = generateRandomString();
 
@@ -139,9 +168,11 @@ app.post('/register',(req, res) => {
     return res.status(409).send("Email already exists")
   }
 
+  const hashedPassword = bcrypt.hashSync(req.body.password, 10);
+
   users[id] = {};
   users[id]['email'] = req.body.email;
-  users[id]['password'] = req.body.password;
+  users[id]['password'] = hashedPassword;
   users[id]['id'] = id;
 
 

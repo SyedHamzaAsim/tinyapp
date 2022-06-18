@@ -15,7 +15,12 @@
     </div>
 
     <% if(user){ %>
-      <a class="nav-item nav-link" href="/logout">Logout</a>
+      <form class="form-inline justify-content-right" action="/logout" method="POST" name="userID">
+        <label for="userID"">
+          Logged in as: <%= user.email %>
+        </label>
+        <button type="submit" class="btn btn-primary">Logout</button>
+      </form>
       <% } %> 
 
   </nav>
