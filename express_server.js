@@ -68,8 +68,6 @@ app.get("/urls", (req, res) => {
 
   const cookieUser =  urlsForUser(req.session.user_id, urlDatabase);
 
-  console.log(cookieUser);
-
   const templateVars = {
     user: users[req.session.user_id],
     urls: cookieUser
