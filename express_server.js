@@ -2,9 +2,9 @@ const express = require("express");
 const app = express();
 const PORT = 8080;
 const bodyParser = require("body-parser");
-const { cookie } = require("request");
 const cookieSession = require("cookie-session");
 const bcrypt = require('bcryptjs');
+
 const {
   getUserByEmail,
   urlsForUser,
@@ -87,7 +87,18 @@ app.get("/urls/new", (req, res) => {
 });
 
 app.get("/urls/:shortURL", (req, res) => {
-  const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL].longURL, user: users[ req.session.user_id] };
+  if (!urlDatabase[shortURL]) {
+    return res.status(404).send('error, nothin here');
+  }
+
+  if (!users[ req.session.user_id]) {
+    return res.status(403).send('error, not logged in');
+  }
+
+  if (!(urlDatabase[shortURL].userID === users[req.session.user_id].id)) {
+    return res.status(403).send('Nice try lol');
+  }
+  const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL].longURL, user: users[req.session.user_id] };
   res.render("urls_show", templateVars);
 });
 
@@ -112,6 +123,11 @@ app.get("/u/:shortURL", (req, res) => {
 });
 
 app.post('/urls/:shortURL/delete', (req, res) => {
+
+  if (!users[ req.session.user_id]) {
+    return res.status(403).send("Access denied");
+  }
+
   delete urlDatabase[req.params.shortURL]
   res.redirect(`/urls`)
 });
