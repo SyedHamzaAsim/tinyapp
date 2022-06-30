@@ -16,25 +16,18 @@ app.use(cookieSession({
   name: 'session',
   keys: ['key0', 'key1'],
 }))
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
 
 const urlDatabase = {
-  b6UTxQ: {
-    longURL: "https://www.tsn.ca",
-    userID: "aJ48lW"
-  },
-  i3BoGr: {
-    longURL: "https://www.google.ca",
-    userID: "aJ48lW"
-  }
 };
-
 
 const users = {};
 
+//landing page: redirects to /urls
 app.get("/", (req, res) => {
-  res.send("Hello!");
+  res.redirect('/urls');
 });
 
 app.listen(PORT, () => {
@@ -45,19 +38,7 @@ app.get("/urls.json", (req, res) => {
   res.json(urlDatabase);
 });
 
-app.get("/hello", (req, res) => {
-  res.send("<html><body>Hello <b>World</b></body></html>\n");
-});
-
-app.get("/set", (req, res) => {
-  const a = 1;
-  res.send(`a = ${a}`);
-});
-
-app.get("/fetch", (req, res) => {
-  res.send(`a = ${a}`);
-});
-
+//urls page, checks if user is logged in, and displays the urls belonging to that user
 app.get("/urls", (req, res) => {
 
   let user_id = req.session.user_id;
@@ -74,6 +55,7 @@ app.get("/urls", (req, res) => {
   return res.render("urls_index", templateVars);
 });
 
+//new url page, redirects if not logged in, otherwise lets you create a new shortened url
 app.get("/urls/new", (req, res) => {
 
   if (!users[req.session['user_id']]) {
@@ -86,7 +68,10 @@ app.get("/urls/new", (req, res) => {
   }
 });
 
+//edit page, made it so you can't edit through a command line if not logged in
 app.get("/urls/:shortURL", (req, res) => {
+  const shortURL = req.params.shortURL;
+
   if (!urlDatabase[shortURL]) {
     return res.status(404).send('error, nothin here');
   }
@@ -102,6 +87,29 @@ app.get("/urls/:shortURL", (req, res) => {
   res.render("urls_show", templateVars);
 });
 
+//just redirects you to the actual page for the shortened url
+app.get("/u/:shortURL", (req, res) => {
+  const shortURL = req.params.shortURL;
+  const longURL = urlDatabase[shortURL].longURL;
+  res.redirect(longURL);
+});
+
+//always accessible, register page
+app.get("/register", (req, res) => {
+  const templateVars = { user: users[ req.session.user_id] };
+
+  res.render("register", templateVars);
+});
+
+//login page kinda straightforward
+app.get("/login", (req, res) => {
+
+  const templateVars = {
+    user: users[ req.session.user_id],
+  };
+  res.render("new-login", templateVars);
+})
+
 
 app.post("/urls", (req, res) => {
   if (req.session.user_id) {
@@ -116,12 +124,7 @@ app.post("/urls", (req, res) => {
   }
 });
 
-app.get("/u/:shortURL", (req, res) => {
-  const shortURL = req.params.shortURL;
-  const longURL = urlDatabase[shortURL].longURL;
-  res.redirect(longURL);
-});
-
+// delete, now not accessible through command line
 app.post('/urls/:shortURL/delete', (req, res) => {
 
   if (!users[ req.session.user_id]) {
@@ -132,8 +135,8 @@ app.post('/urls/:shortURL/delete', (req, res) => {
   res.redirect(`/urls`)
 });
 
-app.post('/urls/:shortURL', (req, res) => {
 
+app.post('/urls/:shortURL', (req, res) => {
   urlDatabase[req.params.shortURL] = {
     longURL: req.body.editURL,
     userID: req.session.user_id,
@@ -141,6 +144,7 @@ app.post('/urls/:shortURL', (req, res) => {
   res.redirect('/urls')
 });
 
+//login attempt. user needs to be registered.
 app.post('/login', (req, res) => {
 
   const user = getUserByEmail(req.body.email, users);
@@ -155,20 +159,18 @@ app.post('/login', (req, res) => {
   } else {
     res.status(403).send('user no existo');
   }
-});
+})
 
+//logout
 app.post("/logout", (req, res) => {
   
   req.session = null;
   res.redirect("/urls");
 })
 
-app.get("/register", (req, res) => {
-  const templateVars = { user: users[ req.session.user_id] };
 
-  res.render("register", templateVars);
-});
 
+//register attempt, email and password need to be entered, email cannot be a duplicate of another account
 app.post('/register', (req, res) => {
 
   let id = generateRandomString();
@@ -188,17 +190,6 @@ app.post('/register', (req, res) => {
   users[id]['password'] = hashedPassword;
   users[id]['id'] = id;
 
-
-
-  res.cookie("user_id", users[id]);
+  req.session.user_id =  users[id]['id'];
   res.redirect('/urls');
 });
-
-
-app.get("/login", (req, res) => {
-
-  const templateVars = {
-    user: users[ req.session.user_id],
-  };
-  res.render("new-login", templateVars);
-})
